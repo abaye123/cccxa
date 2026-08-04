@@ -1,0 +1,42 @@
+# Build output
+bin/
+obj/
+dist/
+dist-setup/
+publish/
+out/
+
+# Rider / Visual Studio / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+.vscode/
+
+# .NET
+*.dll
+*.pdb
+*.exe
+project.lock.json
+*.nuget.props
+*.nuget.targets
+
+# Inno Setup compiler output
+*.iss.log
+
+# Local runtime data / captured snapshots (never commit collected data)
+data/
+*.db
+*.db-wal
+*.db-shm
+screenshots/
+dashboard.html
+history_state.json
+export_*/
+export_all_*/
+
+# OS noise
+Thumbs.db
+desktop.ini
+*.log
