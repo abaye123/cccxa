@@ -42,6 +42,62 @@ public static class Win32
 
     private const uint ATTACH_PARENT_PROCESS = 0xFFFFFFFF;
 
+    // -- רשימת חשבונות המשתמש המקומיים (שמות SAM), לבורר המשתמשים בהגדרות --
+    [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int NetUserEnum(string? servername, int level, int filter,
+        out IntPtr bufptr, int prefmaxlen, out int entriesread, out int totalentries, ref int resumeHandle);
+
+    [DllImport("netapi32.dll")]
+    private static extern int NetApiBufferFree(IntPtr buffer);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct USER_INFO_0 { public string usri0_name; }
+
+    private const int FILTER_NORMAL_ACCOUNT = 0x0002;
+    private const int MAX_PREFERRED_LENGTH = -1;
+    private const int NERR_Success = 0;
+    private const int ERROR_MORE_DATA = 234;
+
+    /// <summary>
+    /// שמות חשבונות המשתמש המקומיים (SAM), ממויינים וללא כפילויות. חשבונות מערכת שאינם
+    /// אינטראקטיביים מסוננים. משמש את בורר המשתמשים בשדות הסינון בדשבורד.
+    /// </summary>
+    public static List<string> LocalUserNames()
+    {
+        var result = new List<string>();
+        try
+        {
+            int resume = 0, status;
+            do
+            {
+                status = NetUserEnum(null, 0, FILTER_NORMAL_ACCOUNT, out var buf, MAX_PREFERRED_LENGTH,
+                    out var read, out _, ref resume);
+                if (status != NERR_Success && status != ERROR_MORE_DATA) break;
+                try
+                {
+                    var size = Marshal.SizeOf<USER_INFO_0>();
+                    var ptr = buf;
+                    for (int i = 0; i < read; i++)
+                    {
+                        var info = Marshal.PtrToStructure<USER_INFO_0>(ptr);
+                        if (!string.IsNullOrWhiteSpace(info.usri0_name)) result.Add(info.usri0_name);
+                        ptr = IntPtr.Add(ptr, size);
+                    }
+                }
+                finally { NetApiBufferFree(buf); }
+            }
+            while (status == ERROR_MORE_DATA);
+        }
+        catch { /* אם המנייה נכשלה - מחזירים מה שנאסף (אולי ריק) */ }
+
+        var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "WDAGUtilityAccount", "DefaultAccount" };
+        return result.Where(n => !skip.Contains(n))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                     .ToList();
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct LASTINPUTINFO
     {

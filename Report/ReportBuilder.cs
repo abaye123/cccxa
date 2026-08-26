@@ -252,16 +252,26 @@ public static class ReportBuilder
         File.WriteAllText(outHtml, html, new System.Text.UTF8Encoding(false));
     }
 
-    /// <summary>מחזיר את תוכן מקטע "Cccxa" מקובץ ההגדרות כ-JSON, להטמעה בטופס ההגדרות.</summary>
+    /// <summary>
+    /// מחזיר את תוכן מקטע "Cccxa" מקובץ ההגדרות כ-JSON, להטמעה בטופס ההגדרות.
+    /// גיבוב הסיסמה (DashboardPasswordHash) מוסר ולא נחשף לדף; במקומו מוטמע דגל בוליאני
+    /// HasPassword כדי שהטופס יידע אם סיסמה כבר מוגדרת.
+    /// </summary>
     private static string LoadSettingsJson(string? configPath)
     {
         try
         {
             if (!string.IsNullOrEmpty(configPath) && File.Exists(configPath))
             {
-                using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
-                if (doc.RootElement.TryGetProperty("Cccxa", out var cccxa))
-                    return cccxa.GetRawText();
+                var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(configPath));
+                if (node?["Cccxa"] is System.Text.Json.Nodes.JsonObject cccxa)
+                {
+                    var hasPw = cccxa["DashboardPasswordHash"] is System.Text.Json.Nodes.JsonValue hv &&
+                                hv.TryGetValue<string>(out var hs) && !string.IsNullOrEmpty(hs);
+                    cccxa.Remove("DashboardPasswordHash");
+                    cccxa["HasPassword"] = hasPw;
+                    return cccxa.ToJsonString(JsonOpts);
+                }
             }
         }
         catch { }
