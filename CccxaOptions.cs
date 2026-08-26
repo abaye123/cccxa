@@ -20,6 +20,13 @@ public sealed class CccxaOptions
     /// </summary>
     public string[] ExcludeUsers { get; set; } = Array.Empty<string>();
 
+    /// <summary>
+    /// גיבוב (hash) של סיסמת הדשבורד להגנה על הגישה לממשק. ריק = ללא סיסמה.
+    /// הפורמט: "pbkdf2$iterations$saltBase64$hashBase64". לעולם לא נשמרת סיסמה גלויה,
+    /// והגיבוב אינו נחשף לדף (מוסתר בהטמעת ההגדרות). ראה DashboardServer.
+    /// </summary>
+    public string DashboardPasswordHash { get; set; } = "";
+
     /// <summary>בדיקה אם מותר לתעד את המשתמש הנוכחי לפי OnlyUsers/ExcludeUsers.</summary>
     public bool IsUserAllowed(string userName)
     {

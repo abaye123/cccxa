@@ -177,6 +177,21 @@
   .save-msg { font-size: 13px; }
   .save-msg.ok { color: hsl(142 71% 42%); }
   .save-msg.err { color: hsl(0 72% 51%); }
+
+  /* user picker */
+  .userpick { grid-column: 1 / -1; }
+  .userpick .pickhint { font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
+  .userlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px 12px; margin-bottom: 10px; }
+  .userchk { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
+    border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 0.25rem); padding: 6px 10px; }
+  .userchk input { width: 16px; height: 16px; flex: none; accent-color: hsl(var(--chart)); cursor: pointer; }
+  .userchk span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: start; }
+  .userchk.custom { border-style: dashed; }
+  .useradd { display: flex; gap: 8px; align-items: center; }
+  .useradd input { max-width: 240px; }
+  .pwrow { grid-column: 1 / -1; }
+  .pwstate { font-size: 12px; }
+  .pwstate.set { color: hsl(142 71% 42%); }
 </style>
 </head>
 <body>
@@ -194,6 +209,7 @@
       <button class="tab" id="tabSet" role="tab" aria-selected="false" data-i18n="tabSettings"></button>
     </div>
 
+    <span class="chip" id="userSelLbl" hidden></span>
     <select id="userSel" hidden></select>
     <button class="btn btn-outline btn-sm" id="langBtn" title="language"></button>
     <button class="btn btn-outline icon-btn" id="themeBtn" title="theme">◐</button>
@@ -322,7 +338,13 @@
       rShots: "צילומים: שמירה (ימים, 0=לתמיד)", rData: "נתונים: שמירה (ימים, 0=לתמיד)", rCheck: "בדיקה כל (שעות)",
       hImport: "ייבא היסטוריית דפדפן", hInterval: "מרווח ייבוא (דקות)",
       pFg: "חלון פעיל (מ״ש)", pProc: "תהליכים (מ״ש)",
-      uOnly: "תעד רק משתמשים אלה (שורה לכל שם, ריק=כולם)", uExclude: "לעולם אל תתעד משתמשים אלה",
+      uOnly: "תעד רק משתמשים אלה (ריק = כולם)", uExclude: "לעולם אל תתעד משתמשים אלה",
+      uPick: "בחר מרשימת משתמשי המחשב, או הוסף שם ידנית:", uAdd: "הוסף שם...", uAddBtn: "הוסף",
+      uNoUsers: "לא נמצאו משתמשים מקומיים - ניתן להוסיף שם ידנית.",
+      secSecurity: "אבטחה", pwState: "מצב", pwIsSet: "כרגע מוגדרת סיסמה לגישה לדשבורד.",
+      pwNotSet: "כרגע אין סיסמה - הגישה פתוחה.", pwSetLabel: "סיסמה חדשה", pwConfirmLabel: "אימות סיסמה",
+      pwKeep: "השאר ריק כדי לא לשנות", pwClear: "הסר את הסיסמה הקיימת (גישה פתוחה)",
+      pwMismatch: "הסיסמאות אינן תואמות.", pwLockNote: "לאחר הגדרת סיסמה, טעינה מחדש של הדף תדרוש התחברות.",
       aStorage: "תיקיית אחסון", aProcs: "שמות תהליכי דפדפן", aAddr: "שמות שורת כתובת (UIA)", aPriv: "מזהי גלישה בסתר"
     },
     en: {
@@ -353,7 +375,13 @@
       rShots: "Screenshots: keep (days, 0=forever)", rData: "Data: keep (days, 0=forever)", rCheck: "Check every (hours)",
       hImport: "Import browser history", hInterval: "Import interval (minutes)",
       pFg: "Foreground (ms)", pProc: "Processes (ms)",
-      uOnly: "Record only these users (one per line, empty=all)", uExclude: "Never record these users",
+      uOnly: "Record only these users (empty = all)", uExclude: "Never record these users",
+      uPick: "Pick from the machine's users, or add a name manually:", uAdd: "Add name...", uAddBtn: "Add",
+      uNoUsers: "No local users found - you can add a name manually.",
+      secSecurity: "Security", pwState: "Status", pwIsSet: "A password is currently required to open the dashboard.",
+      pwNotSet: "No password set - access is open.", pwSetLabel: "New password", pwConfirmLabel: "Confirm password",
+      pwKeep: "Leave blank to keep unchanged", pwClear: "Remove the existing password (open access)",
+      pwMismatch: "Passwords do not match.", pwLockNote: "After setting a password, reloading the page will require sign-in.",
       aStorage: "Storage root", aProcs: "Browser process names", aAddr: "Address bar names (UIA)", aPriv: "Private-mode markers"
     }
   };
@@ -371,6 +399,7 @@
     document.getElementById('langBtn').textContent = lang === 'he' ? 'EN' : 'עב';
     document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-ph]').forEach(function (el) { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
+    document.getElementById('userSelLbl').textContent = t('user');
     if (currentUser) renderCurrent();
     buildSettingsForm();
   }
@@ -403,7 +432,9 @@
     tabSet.setAttribute('aria-selected', d ? 'false' : 'true');
     document.getElementById('panelDash').hidden = !d;
     document.getElementById('panelSet').hidden = d;
-    document.getElementById('userSel').hidden = !d || data.users.length <= 1;
+    var showSel = d && data.users.length > 1;
+    document.getElementById('userSel').hidden = !showSel;
+    document.getElementById('userSelLbl').hidden = !showSel;
   }
 
   /* ---------------- helpers ---------------- */
@@ -490,14 +521,19 @@
   /* ---------------- user selector ---------------- */
   var currentUser = null;
   var sel = document.getElementById('userSel');
+  var selLbl = document.getElementById('userSelLbl');
   if (data.users.length > 1) {
     sel.hidden = false;
+    selLbl.hidden = false;
     data.users.forEach(function (u, i) {
       var o = document.createElement('option');
       o.value = String(i); o.textContent = u.name + ' (' + (u.totals ? u.totals.events : 0) + ')';
       sel.appendChild(o);
     });
-    sel.addEventListener('change', function () { render(data.users[+sel.value]); });
+    sel.addEventListener('change', function () {
+      var u = data.users[+sel.value];
+      if (u) render(u);
+    });
   }
 
   function render(u) { currentUser = u; renderCurrent(); }
@@ -573,8 +609,8 @@
       { k: 'ForegroundPollMs', t: 'pFg', type: 'int' },
       { k: 'ProcessPollMs', t: 'pProc', type: 'int' } ] },
     { sec: 'secUsers', fields: [
-      { k: 'OnlyUsers', t: 'uOnly', type: 'list' },
-      { k: 'ExcludeUsers', t: 'uExclude', type: 'list' } ] },
+      { k: 'OnlyUsers', t: 'uOnly', type: 'users' },
+      { k: 'ExcludeUsers', t: 'uExclude', type: 'users' } ] },
     { sec: 'secAdvanced', fields: [
       { k: 'StorageRoot', t: 'aStorage', type: 'string' },
       { k: 'BrowserProcessNames', t: 'aProcs', type: 'list' },
@@ -583,6 +619,60 @@
   ];
   function getPath(o, path) { return path.split('.').reduce(function (a, k) { return (a == null) ? undefined : a[k]; }, o); }
   function fieldId(k) { return 'set_' + k.replace(/\./g, '_'); }
+
+  // רשימת משתמשי המחשב (נטענת מהשרת) עבור בורר המשתמשים בשדות הסינון.
+  var machineUsers = [];
+
+  function renderUserPicker(fieldKey, arr) {
+    var fid = fieldId(fieldKey);
+    var current = (arr || []).map(function (s) { return String(s); });
+    function has(list, n) { return list.some(function (m) { return m.toLowerCase() === n.toLowerCase(); }); }
+    var names = machineUsers.map(function (n) { return { name: n, custom: false }; });
+    current.forEach(function (n) { if (!has(machineUsers, n)) names.push({ name: n, custom: true }); });
+    var checks = names.map(function (o) {
+      var checked = has(current, o.name);
+      return '<label class="userchk' + (o.custom ? ' custom' : '') + '">' +
+        '<input type="checkbox" data-userfield="' + fid + '" value="' + esc(o.name) + '"' + (checked ? ' checked' : '') + '>' +
+        '<span>' + esc(o.name) + '</span></label>';
+    }).join('');
+    return '<div class="field userpick"><label>' + esc(t(fieldKey === 'OnlyUsers' ? 'uOnly' : 'uExclude')) + '</label>' +
+      '<div class="pickhint">' + esc(t('uPick')) + '</div>' +
+      '<div class="userlist" id="' + fid + '_list">' + checks + '</div>' +
+      (names.length ? '' : '<div class="pickhint">' + esc(t('uNoUsers')) + '</div>') +
+      '<div class="useradd"><input type="text" id="' + fid + '_add" placeholder="' + esc(t('uAdd')) + '">' +
+      '<button type="button" class="btn btn-outline btn-sm" data-adduser="' + fid + '">' + esc(t('uAddBtn')) + '</button></div></div>';
+  }
+
+  function addCustomUser(fid) {
+    var inp = document.getElementById(fid + '_add'); if (!inp) return;
+    var name = (inp.value || '').trim(); if (!name) return;
+    var list = document.getElementById(fid + '_list'); if (!list) return;
+    var boxes = list.querySelectorAll('input[data-userfield="' + fid + '"]');
+    var found = null;
+    Array.prototype.forEach.call(boxes, function (x) { if (x.value.toLowerCase() === name.toLowerCase()) found = x; });
+    if (found) { found.checked = true; }
+    else {
+      var lbl = document.createElement('label'); lbl.className = 'userchk custom';
+      lbl.innerHTML = '<input type="checkbox" data-userfield="' + fid + '" value="' + esc(name) + '" checked><span>' + esc(name) + '</span>';
+      list.appendChild(lbl);
+    }
+    inp.value = '';
+  }
+
+  function securitySectionHtml() {
+    if (!SERVED) return '';
+    var hasPw = !!settings.HasPassword;
+    return '<h2 style="margin-top:6px">' + esc(t('secSecurity')) + '</h2><div class="set-grid">' +
+      '<div class="field pwrow"><span class="pwstate' + (hasPw ? ' set' : '') + '">' +
+        esc(hasPw ? t('pwIsSet') : t('pwNotSet')) + '</span></div>' +
+      '<div class="field"><label for="set_pw_new">' + esc(t('pwSetLabel')) + '</label>' +
+        '<input type="password" id="set_pw_new" autocomplete="new-password" placeholder="' + esc(t('pwKeep')) + '"></div>' +
+      '<div class="field"><label for="set_pw_confirm">' + esc(t('pwConfirmLabel')) + '</label>' +
+        '<input type="password" id="set_pw_confirm" autocomplete="new-password"></div>' +
+      (hasPw ? '<div class="field row pwrow"><label for="set_pw_clear">' + esc(t('pwClear')) + '</label>' +
+        '<label class="switch"><input type="checkbox" id="set_pw_clear"><span class="slider"></span></label></div>' : '') +
+      '<div class="field pwrow"><span class="desc">' + esc(t('pwLockNote')) + '</span></div></div>';
+  }
 
   function buildSettingsForm() {
     var host = document.getElementById('settingsForm');
@@ -593,6 +683,9 @@
         if (f.type === 'bool') {
           return '<div class="field row"><label for="' + id + '">' + esc(t(f.t)) + '</label>' +
             '<label class="switch"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '><span class="slider"></span></label></div>';
+        }
+        if (f.type === 'users') {
+          return renderUserPicker(f.k, Array.isArray(v) ? v : []);
         }
         if (f.type === 'list') {
           var text = Array.isArray(v) ? v.join('\n') : (v || '');
@@ -606,7 +699,7 @@
           '<input type="' + inputType + '"' + step + ' id="' + id + '" value="' + esc(val) + '"></div>';
       }).join('');
       return '<h2 style="margin-top:6px">' + esc(t(sec.sec)) + '</h2><div class="set-grid">' + rows + '</div>';
-    }).join('');
+    }).join('') + securitySectionHtml();
 
     var saveBtn = document.getElementById('saveBtn');
     saveBtn.disabled = !SERVED;
@@ -615,16 +708,22 @@
 
   function collectSettings() {
     var out = JSON.parse(JSON.stringify(settings || {}));
+    delete out.HasPassword; // דגל תצוגה בלבד, אינו הגדרה נשמרת
     SCHEMA.forEach(function (sec) {
       sec.fields.forEach(function (f) {
-        var el = document.getElementById(fieldId(f.k));
-        if (!el) return;
         var val;
-        if (f.type === 'bool') val = el.checked;
-        else if (f.type === 'int') val = el.value === '' ? 0 : parseInt(el.value, 10);
-        else if (f.type === 'float') val = el.value === '' ? 0 : parseFloat(el.value);
-        else if (f.type === 'list') val = el.value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-        else val = el.value;
+        if (f.type === 'users') {
+          var boxes = document.querySelectorAll('input[data-userfield="' + fieldId(f.k) + '"]:checked');
+          val = Array.prototype.map.call(boxes, function (x) { return x.value; });
+        } else {
+          var el = document.getElementById(fieldId(f.k));
+          if (!el) return;
+          if (f.type === 'bool') val = el.checked;
+          else if (f.type === 'int') val = el.value === '' ? 0 : parseInt(el.value, 10);
+          else if (f.type === 'float') val = el.value === '' ? 0 : parseFloat(el.value);
+          else if (f.type === 'list') val = el.value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+          else val = el.value;
+        }
         // set nested path
         var parts = f.k.split('.'), o = out;
         for (var i = 0; i < parts.length - 1; i++) { if (o[parts[i]] == null || typeof o[parts[i]] !== 'object') o[parts[i]] = {}; o = o[parts[i]]; }
@@ -634,15 +733,42 @@
     return out;
   }
 
+  // בורר משתמשים: הוספת שם מותאם (האזנה מוענת - שורדת בנייה מחדש של הטופס).
+  document.getElementById('settingsForm').addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-adduser]');
+    if (btn) addCustomUser(btn.getAttribute('data-adduser'));
+  });
+  document.getElementById('settingsForm').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var el = e.target;
+    if (el && el.id && /_add$/.test(el.id)) { e.preventDefault(); addCustomUser(el.id.replace(/_add$/, '')); }
+  });
+
   document.getElementById('saveBtn').addEventListener('click', function () {
     if (!SERVED) return;
     var msg = document.getElementById('saveMsg');
     var payload = collectSettings();
+
+    // סיסמה: שדות בקרה נפרדים; הגיבוב מתבצע בשרת ולעולם לא עובר דרך הדף.
+    var pwNew = (document.getElementById('set_pw_new') || {}).value || '';
+    var pwConf = (document.getElementById('set_pw_confirm') || {}).value || '';
+    var pwClear = !!(document.getElementById('set_pw_clear') || {}).checked;
+    if (!pwClear && pwNew && pwNew !== pwConf) {
+      msg.className = 'save-msg err'; msg.textContent = t('pwMismatch'); return;
+    }
+    if (pwClear) payload._clearPassword = true;
+    else if (pwNew) payload._newPassword = pwNew;
+
     fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (res.ok) { settings = payload; msg.className = 'save-msg ok'; msg.textContent = t('saved'); }
-        else { msg.className = 'save-msg err'; msg.textContent = t('saveErr') + (res.error || ''); }
+        if (res.ok) {
+          delete payload._newPassword; delete payload._clearPassword;
+          payload.HasPassword = pwClear ? false : (pwNew ? true : !!settings.HasPassword);
+          settings = payload;
+          buildSettingsForm(); // מרענן מצב סיסמה ומנקה את שדות הסיסמה
+          msg.className = 'save-msg ok'; msg.textContent = t('saved');
+        } else { msg.className = 'save-msg err'; msg.textContent = t('saveErr') + (res.error || ''); }
       })
       .catch(function (e) { msg.className = 'save-msg err'; msg.textContent = t('saveErr') + e; });
   });
@@ -658,6 +784,14 @@
   /* ---------------- boot ---------------- */
   document.getElementById('genAt').textContent = data.generatedAt ? (I18N[lang].updated + ': ' + fmt(data.generatedAt)) : '';
   applyLang();
+
+  // רשימת משתמשי המחשב לבורר בשדות הסינון (רק בדשבורד החי); מרעננים את הטופס בהגעה.
+  if (SERVED) {
+    fetch('/api/users').then(function (r) { return r.json(); }).then(function (list) {
+      if (Array.isArray(list) && list.length) { machineUsers = list; buildSettingsForm(); }
+    }).catch(function () {});
+  }
+
   if (data.users.length === 0) {
     document.getElementById('tiles').innerHTML = '<div class="tile"><div class="k">' + t('noData') + '</div><div class="v">-</div></div>';
   } else {
