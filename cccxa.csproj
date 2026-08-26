@@ -7,6 +7,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <AssemblyName>cccxa</AssemblyName>
     <RootNamespace>Cccxa</RootNamespace>
+    <Version>1.0.1</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>

@@ -10,7 +10,7 @@
 ; and lets the user opt out of the desktop icon and the Start Menu folder.
 
 #define AppName "cccxa"
-#define AppVer  "1.0.0"
+#define AppVer  "1.0.1"
 
 [Setup]
 AppId={{9F2C7A54-6B1E-4C0A-9E3D-CCCXA0000001}}
