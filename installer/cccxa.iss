@@ -19,6 +19,10 @@ AppVersion={#AppVer}
 DefaultDirName={autopf}\cccxa
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
+; Shortcuts are intentionally placed in the installing user's own Desktop/Start Menu
+; (userdesktop/userprograms) rather than the all-users areas, so monitored users never
+; see a dashboard shortcut. This is deliberate - silence Inno's per-user-area warning.
+UsedUserAreasWarning=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist-setup
